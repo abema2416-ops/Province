@@ -1276,6 +1276,7 @@ function newGame(o) {
 }
 function freshMonth() { return { inc: {}, exp: {} }; }
 function addMoney(n, line, isExp) {
+  if (typeof n !== 'number' || !isFinite(n)) { if (self.console) console.warn('addMoney: не число', n, line); return; }
   G.money += n; var m = G.month, k = isExp ? 'exp' : 'inc';
   if (line) m[k][line] = (m[k][line] || 0) + Math.abs(n);
 }
@@ -1291,7 +1292,7 @@ function econMonth() {
 }
 // ---- your own money: a salary from the ministry, a bonus from the profit of the fund, your expenses -------------------------------------------
 function salaryBase() { return Math.round((2500 + Math.sqrt(G.start) * 1.2) / 100) * 100; }
-function pAdd(n, line, isExp) { var P = G.player; P.cash += n; if (!P.month) P.month = freshMonth(); var k = isExp ? 'exp' : 'inc'; if (line) P.month[k][line] = (P.month[k][line] || 0) + Math.abs(n); }
+function pAdd(n, line, isExp) { if (typeof n !== 'number' || !isFinite(n)) { if (self.console) console.warn('pAdd: не число', n, line); return; } var P = G.player; P.cash += n; if (!P.month) P.month = freshMonth(); var k = isExp ? 'exp' : 'inc'; if (line) P.month[k][line] = (P.month[k][line] || 0) + Math.abs(n); }
 function personalMonth(day, netOp) {
   var P = G.player, I = priceIdx(), sal = salaryBase() * I, bonus = netOp > 0 ? netOp * 0.015 : 0;
   pAdd(sal, 'Зарплата управляющего');
@@ -1724,6 +1725,8 @@ function deserialize(str) {
   if (!o.owned) o.owned = M.districts.map(function () { return 1; });                   // old saves: the whole province is yours
   if (!o.econ) o.econ = { infl: 0.04, idx: 1, key: 0.065, hist: [] };
   load4(o);
+  if (typeof o.money !== 'number' || !isFinite(o.money)) { var good = (o.history || []).filter(function (x) { return x && typeof x.money === 'number' && isFinite(x.money); }); o.money = good.length ? good[good.length - 1].money : (o.start || 0); o.moneyFixed = true; }
+  if (typeof o.player.cash !== 'number' || !isFinite(o.player.cash)) o.player.cash = 0;
   if (o.player.cash === undefined) { o.player.cash = 0; o.player.fed = 70; o.player.month = freshMonth(); o.player.reports = []; }
   M.buildings = o.buildings; M.bld.fill(-1);
   M.buildings.forEach(function (b) { if (b.gone) return; var s = BT[b.t].size; for (var yy = 0; yy < s; yy++) for (var xx = 0; xx < s; xx++) M.bld[idx(b.x + xx, b.y + yy)] = b.id; });
@@ -2400,7 +2403,7 @@ function leaderPortrait(L, scale) {
   function put(x, y, col, a) { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= W || y >= H) return; var v = cache[col] || (cache[col] = rgb(col)), o = (y * W + x) * 4, k = a === undefined ? 1 : a; d[o] = d[o] * (1 - k) + v[0] * k; d[o + 1] = d[o + 1] * (1 - k) + v[1] * k; d[o + 2] = d[o + 2] * (1 - k) + v[2] * k; d[o + 3] = 255; }
   var fl = L.flag || ['#3a4a6a', '#5a6a8a', '#3a4a6a'];
   for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) { var band = fl[Math.min(2, Math.floor(y / H * 3))], v = Math.hypot(x - 28, y - 24) / 38; put(x, y, mixh(shade(band, -0.3), '#0e121c', clamp(v * 0.9, 0.15, 0.85))); }
-  var sk = SKIN_TONES[L.skin || 0], hc = HAIR_COL[L.hc || 0], cx = 28, cy = 25, rx = L.fem ? 10.2 : 11.2, ry = L.fem ? 13 : 13.8, age = L.age || 50;
+  var sk = SKIN_TONES[(L.skin || 0) % SKIN_TONES.length], hc = HAIR_COL[(L.hc || 0) % HAIR_COL.length], cx = 28, cy = 25, rx = L.fem ? 10.2 : 11.2, ry = L.fem ? 13 : 13.8, age = L.age || 50;
   var faceHW = function (yy) { var t = (yy - cy) / ry; if (Math.abs(t) > 1) return -1; var hw = rx * Math.sqrt(1 - t * t); if (t > 0.15) hw *= 1 - (t - 0.15) * (L.fem ? 0.6 : 0.42); return hw; };
   // long hair falls behind the shoulders
   if (L.hair === 'long') for (var y1 = cy - 6; y1 < 56; y1++) { var hw1 = rx + 3 - Math.max(0, y1 - 44) * 0.2; for (var x1 = cx - hw1; x1 <= cx + hw1; x1++) put(x1, y1, (x1 < cx - 4 ? hc[1] : hc[0])); }
@@ -7023,6 +7026,7 @@ function speechStep(T) {
     list.appendChild(h('button', { class: 'pbtn dopt', onclick: function () {
       var v = L[1] * (L[1] > 0 ? T.crowd : 1) + (L[2] === 'pop' && ST.npcs.some(function (n) { return n.rk === 'jobless'; }) ? 0.8 : 0); T.score += v; T.round++; sfx(v >= 1 ? 'note' : 'click');
       var good = ['Правильно!', 'Вот это по делу!', 'Браво!', 'Наконец-то честно!', 'Поддерживаем!'], bad = ['Слышали уже!', 'Враньё!', 'Где обещанное?', 'Позор!', 'Да ну…'], mid = ['Посмотрим…', 'Ну-ну.', 'Хм.'];
+      if (!ST.speech) return;
       ST.speech.reacts = ST.npcs.map(function (n) { var r = Math.random(); return { n: n, txt: v >= 1.2 ? (r < 0.6 ? pick(good, Math.random()) : '') : v <= -0.5 ? (r < 0.6 ? pick(bad, Math.random()) : '') : (r < 0.3 ? pick(mid, Math.random()) : ''), up: v >= 1.2, until: ST.t + 3.5 }; });
       T.last = '«' + L[0] + '» — ' + (v >= 1.5 ? 'аплодисменты.' : v >= 0.5 ? 'одобрительный гул.' : v > -0.5 ? 'тишина, кто-то пожал плечами.' : 'свист и выкрики.');
       speechStep(T);
@@ -8053,7 +8057,7 @@ function tripCard(s) {
   ];
   var btns = [['Отмена', null]];
   if (s.fac) btns.push(['Осмотреть объект', function () { enterSite(s.fac); }]);
-  btns.push([(done ? 'Поехать в гости' : 'Поехать учиться') + ' · ' + moneyShort(I.cost), function () { startStudy(s); }, 'gold']);
+  btns.push([(done ? 'Поехать в гости' : 'Поехать учиться') + ' · ' + moneyShort(I.cost), function () { startTrip(s); }, 'gold']);
   showModal(s.n, kids, btns);
 }
 // ---- the trip itself --------------------------------------------------------------------------------------------------------------------------
@@ -8067,7 +8071,7 @@ function studyPal(s) {
   if (f) { p.longHair = true; p.lash = true; if (s.th === 'people' || s.th === 'city') { p.skirt = '#2a3448'; } }
   return p;
 }
-function startStudy(s) {
+function startTrip(s) {
   var I = tripInfo(s);
   if (G.money < I.cost) { toast('На поездку не хватает денег: нужно ' + moneyShort(I.cost) + '.', 'bad'); return; }
   if (!tire(12, 'поездка')) return;
